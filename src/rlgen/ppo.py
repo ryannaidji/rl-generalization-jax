@@ -35,6 +35,8 @@ class Config(NamedTuple):
     ent_coef: float = 0.01
     max_grad_norm: float = 0.5
     hidden: int = 64
+    clip_value: bool = True
+    reward_scale: float = 1.0
     faults: Faults = Faults()
 
     @property
@@ -124,10 +126,11 @@ def ppo_loss(params, batch, cfg: Config):
         -adv * ratio, -adv * jnp.clip(ratio, 1 - cfg.clip_eps, 1 + cfg.clip_eps)
     ).mean()
 
-    v_clipped = batch["values"] + jnp.clip(values - batch["values"], -cfg.clip_eps, cfg.clip_eps)
-    v_loss = 0.5 * jnp.maximum(
-        (values - batch["targets"]) ** 2, (v_clipped - batch["targets"]) ** 2
-    ).mean()
+    v_err = (values - batch["targets"]) ** 2
+    if cfg.clip_value:
+        v_clipped = batch["values"] + jnp.clip(values - batch["values"], -cfg.clip_eps, cfg.clip_eps)
+        v_err = jnp.maximum(v_err, (v_clipped - batch["targets"]) ** 2)
+    v_loss = 0.5 * v_err.mean()
     entropy = categorical_entropy(logits).mean()
     total = pg_loss + cfg.vf_coef * v_loss - cfg.ent_coef * entropy
     aux = {
@@ -201,10 +204,10 @@ def make_train(cfg: Config):
             )(step_keys, state, actions, contexts)
             done = term | trunc
             new_ret = ep_ret + rew
-            train_rew = rew
+            train_rew = rew * cfg.reward_scale
             if not cfg.faults.truncation_as_termination:
                 # A time limit is not a terminal state: bootstrap from the state we stopped in.
-                train_rew = rew + cfg.gamma * critic_value(params_, final_obs) * trunc
+                train_rew = train_rew + cfg.gamma * critic_value(params_, final_obs) * trunc
             t = Transition(obs, actions, log_p, values, train_rew,
                            done.astype(jnp.float32), new_ret, done)
             ep_ret = jnp.where(done, 0.0, new_ret)

@@ -1,0 +1,6 @@
+trained 150000 env steps on 8 contexts in 7.7s (backend: cpu)
+final explained variance 0.207, approx KL 0.0000
+set                         PPO greedy    random
+train contexts                   499.8      22.5
+held-out interpolation           500.0      18.7
+held-out extrapolation           500.0      18.6

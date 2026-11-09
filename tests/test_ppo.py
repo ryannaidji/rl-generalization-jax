@@ -74,6 +74,17 @@ def test_policy_clip_bounds_the_gain():
     assert float(aux["pg_loss"]) == pytest.approx(-(1 + cfg.clip_eps), abs=1e-5)
 
 
+def test_value_clip_blocks_large_value_moves():
+    cfg = ppo.Config()
+    params = ppo.init_params(jax.random.PRNGKey(0), cfg)
+    obs = jnp.zeros((2, 4))
+    v = ppo.critic_value(params, obs)
+    batch = dict(obs=obs, actions=jnp.zeros(2, int), log_probs=jnp.zeros(2), values=v - 5.0,
+                 advantages=jnp.zeros(2), targets=v + 100.0)
+    grad = lambda c: jax.grad(lambda p: ppo.ppo_loss(p, batch, c)[0])(params)["critic"][-1]["b"]
+    assert float(jnp.abs(grad(cfg)).sum()) < float(jnp.abs(grad(cfg._replace(clip_value=False))).sum())
+
+
 def test_explained_variance():
     t = jnp.arange(10.0)
     assert float(ppo.explained_variance(t, t)) == pytest.approx(1.0)

@@ -1,0 +1,24 @@
+name: debug-value
+# Runs the exploratory value-loss follow-up and commits its JSON.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=src:. python -m experiments.debug_value
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add results
+          git commit -m "Value-loss follow-up results from run ${{ github.run_id }}" || echo "nothing to commit"
+          git pull --rebase origin main
+          git push
