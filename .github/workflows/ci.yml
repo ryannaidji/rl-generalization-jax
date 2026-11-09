@@ -1,0 +1,28 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+  notebook-smoke:
+    # Executes the Colab notebook on CPU with 16 pairs to check the wiring. Output is never a result.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DPO_SMOKE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install nbconvert ipykernel "transformers>=4.45,<5" "datasets>=2.20,<4" accelerate
+      - run: jupyter nbconvert --to notebook --execute --output-dir /tmp/nb colab/dpo_colab.ipynb
